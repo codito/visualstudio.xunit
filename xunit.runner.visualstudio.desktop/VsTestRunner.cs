@@ -130,7 +130,7 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
             RunTests(
                 runContext, frameworkHandle, logger,
                 () => tests.GroupBy(testCase => testCase.Source)
-                           .Select(group => new AssemblyRunInfo { AssemblyFileName = group.Key, Configuration = LoadConfiguration(group.Key), TestCases = group.ToList() })
+                           .Select(group => new AssemblyRunInfo { AssemblyFileName = group.Key, Configuration = LoadConfiguration(group.Key), VSTestCases = group.ToList(), TestCases = group.Select(tc => Deserialize(logger, null, tc)).ToList() })
                            .ToList()
             );
         }
@@ -218,7 +218,7 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
                                         {
                                             reporterMessageHandler.OnMessage(new TestAssemblyDiscoveryStarting(assembly, framework.CanUseAppDomains && AppDomainDefaultBehavior != AppDomainSupport.Denied, shadowCopy, discoveryOptions));
 
-                                            framework.Find(includeSourceInformation: true, discoveryMessageSink: visitor, discoveryOptions: discoveryOptions);
+                                            framework.Find(includeSourceInformation: RunSettingsHelper.DesignMode, discoveryMessageSink: visitor, discoveryOptions: discoveryOptions);
                                             var totalTests = visitor.Finish();
 
                                             visitComplete?.Invoke(assemblyFileName, framework, discoveryOptions, visitor);
@@ -328,7 +328,8 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
                 {
                     AssemblyFileName = assemblyInfo.AssemblyFileName,
                     Configuration = LoadConfiguration(assemblyInfo.AssemblyFileName),
-                    TestCases = filteredTestCases.Select(dtc => dtc.VSTestCase).ToList(),
+                    TestCases = filteredTestCases.Select(dtc => dtc.TestCase).ToList(),
+                    VSTestCases = filteredTestCases.Select(dtc => dtc.VSTestCase).ToList(),
                 };
             }).ToList();
         }
@@ -452,9 +453,15 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
                 var diagnosticSink = new DiagnosticMessageSink(logger, assemblyDisplayName, runInfo.Configuration.DiagnosticMessagesOrDefault);
                 using (var controller = new XunitFrontController(appDomain, assemblyFileName: assemblyFileName, configFileName: null, shadowCopy: shadowCopy, diagnosticMessageSink: MessageSinkAdapter.Wrap(diagnosticSink)))
                 {
-                    var xunitTestCases = runInfo.TestCases.Select(tc => new { vs = tc, xunit = Deserialize(logger, controller, tc) })
+                    // At this point assume, tests are already in ITestCase format
+#if !NETCOREAPP1_0
+                    var xunitTestCases = runInfo.VSTestCases.Select(tc => new { vs = tc, xunit = Deserialize(logger, controller, tc) })
                                                           .Where(tc => tc.xunit != null)
                                                           .ToDictionary(tc => tc.xunit, tc => tc.vs);
+#else
+                    var xunitTestCases = runInfo.TestCases.Zip(runInfo.VSTestCases, (xunit, vs) => new { Key = xunit, Value = vs} )
+                                                          .ToDictionary(tc => tc.Key, tc => tc.Value);
+#endif
 
                     var executionOptions = TestFrameworkOptions.ForExecution(runInfo.Configuration);
                     if (RunSettingsHelper.DisableParallelization)
@@ -465,11 +472,8 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
 
                     reporterMessageHandler.OnMessage(new TestAssemblyExecutionStarting(assembly, executionOptions));
 
-
-
                     using (var vsExecutionSink = new VsExecutionSink(reporterMessageHandler, frameworkHandle, logger, xunitTestCases, executionOptions, () => cancelled))
                     {
-
                         IExecutionSink resultsSink = vsExecutionSink;
                         if (longRunningSeconds > 0)
                             resultsSink = new DelegatingLongRunningTestDetectionSink(resultsSink, TimeSpan.FromSeconds(longRunningSeconds), diagnosticSink);
@@ -665,6 +669,8 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
 
             public TestCase VSTestCase { get; }
 
+            public ITestCase TestCase { get; }
+
             string uniqueID;
 
             public DiscoveredTestCase(string source, ITestFrameworkDiscoverer discoverer, ITestCase testCase, LoggerHelper logger)
@@ -672,6 +678,7 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
                 Name = $"{testCase.TestMethod.TestClass.Class.Name}.{testCase.TestMethod.Method.Name}";
                 TraitNames = testCase.Traits.Keys;
                 VSTestCase = VsDiscoverySink.CreateVsTestCase(source, discoverer, testCase, forceUniqueName: false, logger: logger);
+                TestCase = testCase;
                 uniqueID = testCase.UniqueID;
             }
 

@@ -72,10 +72,17 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
         {
             try
             {
-                var serializedTestCase = discoverer.Serialize(xunitTestCase);
                 var fqTestMethodName = $"{xunitTestCase.TestMethod.TestClass.Class.Name}.{xunitTestCase.TestMethod.Method.Name}";
                 var result = new TestCase(fqTestMethodName, uri, source) { DisplayName = Escape(xunitTestCase.DisplayName) };
-                result.SetPropertyValue(VsTestRunner.SerializedTestCaseProperty, serializedTestCase);
+
+                // TODO this needs to be injected
+                if (RunSettingsHelper.DesignMode)
+                {
+                    // In case of DesignMode (Editors/IDE). The user could select and send testcases. We need to pass
+                    // the ITestCase context so that we can read it back later
+                    var serializedTestCase = discoverer.Serialize(xunitTestCase);
+                    result.SetPropertyValue(VsTestRunner.SerializedTestCaseProperty, serializedTestCase);
+                }
                 result.Id = GuidFromString(uri + xunitTestCase.UniqueID);
 
                 if (forceUniqueName)
@@ -92,8 +99,11 @@ namespace Xunit.Runner.VisualStudio.TestAdapter
                     }
                 }
 
-                result.CodeFilePath = xunitTestCase.SourceInformation.FileName;
-                result.LineNumber = xunitTestCase.SourceInformation.LineNumber.GetValueOrDefault();
+                if (RunSettingsHelper.DesignMode)
+                {
+                    result.CodeFilePath = xunitTestCase.SourceInformation.FileName;
+                    result.LineNumber = xunitTestCase.SourceInformation.LineNumber.GetValueOrDefault();
+                }
 
                 return result;
             }

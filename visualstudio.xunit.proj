@@ -57,7 +57,7 @@
   </Target>
 
   <Target Name="Build" DependsOnTargets="PackageRestore;_BuildProject" />
-  <Target Name="Test" DependsOnTargets="Build;_Test" />
+  <Target Name="Test" DependsOnTargets="SetVersionNumber;Build;_Test" />
 
   <Target Name="_NoCache">
     <PropertyGroup>
@@ -66,9 +66,15 @@
   </Target>
 
   <Target Name="_BuildProject">
+    <!--<MSBuild-->
+        <!--Projects="xunit.runner.visualstudio.desktop\xunit.runner.visualstudio.desktop.csproj;-->
+                  <!--xunit.runner.visualstudio.uwp\xunit.runner.visualstudio.uwp.csproj;-->
+                  <!--test.harness\test.harness.csproj;-->
+                  <!--test.xunit.runner.visualstudio.desktop\test.xunit.runner.visualstudio.desktop.csproj"-->
+        <!--Targets="Build"-->
+        <!--Properties="Configuration=$(Configuration);TrackFileAccess=$(TrackFileAccess)"/>-->
     <MSBuild
         Projects="xunit.runner.visualstudio.desktop\xunit.runner.visualstudio.desktop.csproj;
-                  xunit.runner.visualstudio.uwp\xunit.runner.visualstudio.uwp.csproj;
                   test.harness\test.harness.csproj;
                   test.xunit.runner.visualstudio.desktop\test.xunit.runner.visualstudio.desktop.csproj"
         Targets="Build"

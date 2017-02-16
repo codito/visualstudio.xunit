@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+using Xunit.Abstractions;
 
 namespace Xunit.Runner.VisualStudio
 {
@@ -7,6 +8,7 @@ namespace Xunit.Runner.VisualStudio
     {
         public string AssemblyFileName;
         public TestAssemblyConfiguration Configuration;
-        public IList<TestCase> TestCases;
+        public IList<TestCase> VSTestCases;
+        public IList<ITestCase> TestCases;
     }
 }
